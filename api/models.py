@@ -1,12 +1,12 @@
 from django.db import models
 from django.core.validators import MinValueValidator
-
+from django.core.exceptions import ValidationError
 # Create your models here.
 class Producto(models.Model):
 
     NOMBRE = models.CharField(max_length=100)
 
-    CANTIDAD = models.IntegerField(validators=[MinValueValidator(0)])
+    CANTIDAD = models.FloatField(validators=[MinValueValidator(0)])
 
     PRECIO = models.FloatField(validators=[MinValueValidator(0)])
 
@@ -14,11 +14,58 @@ class Producto(models.Model):
     def __str__(self):
         return f"{self.NOMBRE}, {self.CANTIDAD}, {self.PRECIO}"
 
+class Direccion(models.Model): 
+
+    CALLE = models.CharField(max_length=200)
+    NUMERO = models.IntegerField(validators=[
+        MinValueValidator(0)
+    ])
+    COLONIA = models.CharField(max_length=200)
+    CIUDAD = models.CharField(max_length=200)
+    MUNICIPIO = models.CharField(max_length=200)
+    CP = models.IntegerField(validators=[
+        MinValueValidator(0)
+    ])
+
+    def __str__(self):
+        return f'{self.CALLE}, {self.NUMERO}, {self.COLONIA}'
 
 class Cliente(models.Model):
 
-    NOMBRE = models.CharField(max_length=100)
+    TIPOS_DE_PAGO = (
+        ('EFECTIVO', 'EFECTIVO'),
+        ('CREDITO', 'CREDITO'),
+    )
 
+    NOMBRE = models.CharField(max_length=200)
+
+    CONTACTO = models.CharField(max_length=200, null=True)
+
+    DIRECCION = models.OneToOneField(Direccion, on_delete=models.SET_NULL, null=True)
+
+    TELEFONO = models.IntegerField(validators=[MinValueValidator(0)], null=True, unique=True)
+    CORREO = models.CharField(max_length=200, null=True, unique=True)
+    TIPO_PAGO = models.CharField(max_length=200, choices=TIPOS_DE_PAGO, null=True)
+
+    def clean(self):
+
+        # obtener clientes con nombre y telefono
+        clientes_existentes = Cliente.objects.filter(models.Q(CORREO=self.CORREO) | models.Q(TELEFONO = self.TELEFONO)).exclude(id=self.id)
+
+        # crea una lista de mensajes de error a mostrar al usuario
+
+        mensajes_error = []
+
+        if clientes_existentes.exists():
+
+            if clientes_existentes.filter(CORREO=self.CORREO).exists():
+                mensajes_error.append('Un cliente con este correo ya existe.')
+
+            if clientes_existentes.filter(TELEFONO=self.TELEFONO).exists():
+                mensajes_error.append('Un cliente con este teléfono ya existe.')
+
+            raise ValidationError(mensajes_error)
+        
     def __str__(self):
         return str(self.NOMBRE)
     
