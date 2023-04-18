@@ -1,6 +1,19 @@
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
+
+class Empleado(models.Model): 
+
+    USUARIO = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True) 
+
+    IMAGEN = models.ImageField(default='imagenes/empleados/user-default.png', upload_to='imagenes/empleados')
+
+    def __str__(self):
+        return f'{self.USUARIO.first_name}, {self.IMAGEN}'
+
+
+
 # Create your models here.
 class Producto(models.Model):
 
@@ -9,6 +22,8 @@ class Producto(models.Model):
     CANTIDAD = models.FloatField(validators=[MinValueValidator(0)])
 
     PRECIO = models.FloatField(validators=[MinValueValidator(0)])
+
+    IMAGEN = models.ImageField(default='imagenes/producto_default.jpg', upload_to='imagenes')
 
     # RECUERDA NO PONER NADA QUE SE PUEDE VOLVER NULL AQUI
     def __str__(self):
@@ -20,12 +35,16 @@ class Direccion(models.Model):
     NUMERO = models.IntegerField(validators=[
         MinValueValidator(0)
     ])
-    COLONIA = models.CharField(max_length=200)
+    COLONIA = models.CharField(max_length=200, null=True, blank=True)
     CIUDAD = models.CharField(max_length=200)
-    MUNICIPIO = models.CharField(max_length=200)
+    MUNICIPIO = models.CharField(max_length=200, null=True, blank=True)
     CP = models.IntegerField(validators=[
         MinValueValidator(0)
-    ])
+    ], null=True, blank=True)
+
+    class Meta:
+
+        verbose_name_plural = 'Direcciones'
 
     def __str__(self):
         return f'{self.CALLE}, {self.NUMERO}, {self.COLONIA}'
@@ -41,7 +60,7 @@ class Cliente(models.Model):
 
     CONTACTO = models.CharField(max_length=200, null=True)
 
-    DIRECCION = models.OneToOneField(Direccion, on_delete=models.SET_NULL, null=True)
+    DIRECCION = models.OneToOneField(Direccion, on_delete=models.SET_NULL, null=True, blank=True)
 
     TELEFONO = models.IntegerField(validators=[MinValueValidator(0)], null=True, unique=True)
     CORREO = models.CharField(max_length=200, null=True, unique=True)
@@ -100,6 +119,10 @@ class Venta(models.Model):
 
     OBSERVACIONES = models.CharField(max_length=100)
 
+    DESCUENTO = models.FloatField(validators=[
+        MinValueValidator(0), MaxValueValidator(100)
+    ], null=True, blank=True)
+
     def __str__(self):
         return f"{self.TIPO_VENTA}, {self.MONTO}, {self.TIPO_PAGO}"
 
@@ -113,3 +136,4 @@ class ProductoVenta(models.Model):
 
     def __str__(self):
         return f"{self.VENTA}, {self.PRODUCTO.NOMBRE}"
+

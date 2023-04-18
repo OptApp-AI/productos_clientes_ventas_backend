@@ -3,6 +3,20 @@ from . import views
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
+
+    # Cuenta
+    # path('crear-user/', views.crear_user),
+    path('cuenta-detalles/', views.cuenta_detail),
+    path('modificar-cuenta/', views.modificar_cuenta),
+
+    # Borrar cuenta
+
+    # Usuarios
+    path('usuarios/', views.usuario_list),
+    path('usuarios/<str:pk>/', views.usuario_detail),
+    path('crear-cuenta/', views.crear_user),
+    path("modificar-usuario/<str:pk>/", views.modificar_usuario),
+
     # Productos
     path("productos/", views.producto_list),
     path("crear-producto/", views.crear_producto),
@@ -22,6 +36,6 @@ urlpatterns = [
     path("modificar-venta/<str:pk>/", views.modificar_venta),
 
     # Login
-     path('token/', views.MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
-      path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/', views.MyTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]

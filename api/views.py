@@ -2,27 +2,153 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-from .models import Producto, Cliente, PrecioCliente, Venta, ProductoVenta
-from .serializers import ProductoSerializer, ClienteSerializer, PrecioClienteSerializer, VentaSerializer, ProductoVentaSerializer
+from .models import Producto, Cliente, PrecioCliente, Venta, ProductoVenta, Direccion
+from .serializers import ProductoSerializer, ClienteSerializer, PrecioClienteSerializer, VentaSerializer, ProductoVentaSerializer, UserSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
+from django.contrib.auth.models import User 
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import AnonymousUser
+
+
+
+
+@api_view(['GET'])
+def cuenta_detail(request):
+    # the first line of code retrieves the User object associated with the current request by accessing the user attribute of the request object. The request.user attribute is automatically populated by Django's authentication middleware, which verifies the user's credentials based on the authentication backend that is configured in the Django settings.
+    user = request.user 
+
+    serializer = UserSerializer(user)
+
+    return Response(serializer.data)
+
+@api_view(['POST'])
+def modificar_cuenta(request):
+
+    user = request.user
+
+    if isinstance(user, AnonymousUser):
+
+        return Response({'Detalles': 'Necesitar autenticarte para modificar tu usuario'})
+
+    data = request.data 
+
+    if data['password1'] != data['password2']:
+        return Response({'Detalles': 'Las constraseñas deben ser iguales'})
+    
+    try:
+        user.username = data['username']
+        user.password = make_password(data['password1'])
+        user.first_name = data['name']
+        user.is_staff = data['is_admin']
+
+        user.save()
+
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    
+    except:
+        return Response({'Detalles': 'Un usuario con este username ya existe'}, status=status.HTTP_400_BAD_REQUEST) 
+
+@api_view(['POST'])
+def crear_user(request):
+
+    data = request.data 
+
+
+    is_admin = data['is_admin']
+    print('',)
+
+    print(is_admin == False, is_admin)
+
+    if data['password1'] != data['password2']:
+        return Response({'Detalles': 'Las constraseñas deben ser iguales'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.create(
+        username = data['username'],
+        password=make_password(data['password1']),
+        first_name=data['name'],
+        is_staff =True if data['is_admin'] == "true" else False
+    )
+
+        serializer = UserSerializer(user)
+        return Response(serializer.data)
+    
+    except:
+        return Response({'Detalles': 'Un usuario con este username ya existe'}, status=status.HTTP_400_BAD_REQUEST) 
+
+
+@api_view(['GET'])
+def usuario_list(request):
+
+    queryset = User.objects.all()
+
+    serializer = UserSerializer(queryset, many=True)
+
+    return Response(serializer.data)
+
+
+@api_view(['GET'])
+def usuario_detail(request, pk):
+
+    try:
+        usuario = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return Response({"Detalles": 'El usuario no existe'}, status=status.HTTP_404_NOT_FOUND)
+    
+    serializer = UserSerializer(usuario)
+    return Response(serializer.data)
+    
+    
+@api_view(['PUT', 'DELETE'])
+def modificar_usuario(request, pk):
+
+    data = request.data 
+    try:
+        usuario = User.objects.get(pk=pk)
+    except User.DoesNotExist:
+        return Response(status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'PUT':
+        
+        usuario.is_staff = True if data['is_admin'] == "true" else False
+        usuario.save()
+
+        serializer = UserSerializer(usuario)
+
+        return Response(serializer.data)
+    
+    if request.method == 'DELETE':
+        usuario.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
-    @classmethod
-    def get_token(cls, user):
-        token = super().get_token(user)
+    # @classmethod
+    # def get_token(cls, user):
+    #     token = super().get_token(user)
 
-        # Add custom claims
-        token['username'] = user.username
-        
+    #     # Add custom claims
+    #     token['username'] = user.username
+    
+    #     return token
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+    
+        serializer = UserSerializer(self.user).data 
 
-        return token
+        for k, v in serializer.items():
+            data[k] = v 
 
+        return data 
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
 
     serializer_class = MyTokenObtainPairSerializer
+
 
 # Vistas para productos
 @api_view(['GET'])
@@ -58,6 +184,8 @@ def crear_producto(request):
 
 
         return Response(serializer.data)
+    print(serializer.errors)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
 
 @api_view(['GET'])
@@ -84,7 +212,8 @@ def modificar_producto(request, pk):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        return Response(serializer.errors)
+        print(serializer.errors)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
         producto.delete()
@@ -106,6 +235,7 @@ def crear_cliente(request):
 
     # Crear cliente
     serializer = ClienteSerializer(data=data)
+    
     if serializer.is_valid():
         cliente = serializer.save()
 
@@ -120,10 +250,22 @@ def crear_cliente(request):
             )
 
             nuevo_precio_cliente.save()
+        
+        # Crear direccion 
+        direccion = data['direccion']
+
+        nueva_direccion = Direccion.objects.create(**direccion)
+        
+        nueva_direccion.save()
+
+        cliente.DIRECCION = nueva_direccion
+
+        cliente.save()
 
         # Por lo tanto, es importante tener en cuenta que, aunque creas los objetos PrecioCliente después de haber validado y serializado el objeto Cliente, estos objetos estarán disponibles en la instancia del objeto Cliente y se incluirán en la respuesta cuando se serialice el objeto Cliente utilizando el serializer ClienteSerializer.
         return Response(serializer.data)
-    return Response(serializer.errors)
+    print(serializer.errors)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
 @api_view(['GET'])
 def cliente_detail(request, pk):
@@ -152,6 +294,7 @@ def modificar_cliente(request, pk):
         if serializer.is_valid():
             serializer.save()
 
+            # Modificar el precio de los clientes
             nuevos_precios_cliente = data["nuevosPreciosCliente"]
 
             for nuevo_precio_cliente in nuevos_precios_cliente:
@@ -159,6 +302,20 @@ def modificar_cliente(request, pk):
                 precioCliente = PrecioCliente.objects.get(pk=nuevo_precio_cliente["precioClienteId"])
                 precioCliente.PRECIO = nuevo_precio_cliente["nuevoPrecioCliente"]
                 precioCliente.save()
+
+            # Modificar la direccion
+            nueva_direccion = data['nuevaDireccion']
+
+            direccionCliente = Direccion.objects.get(pk = nueva_direccion['direccionClienteId'])
+
+            direccionCliente.CALLE = nueva_direccion['CALLE']
+            direccionCliente.NUMERO = nueva_direccion['NUMERO']
+            direccionCliente.COLONIA = nueva_direccion['COLONIA']
+            direccionCliente.CIUDAD = nueva_direccion['CIUDAD']
+            direccionCliente.MUNICIPIO = nueva_direccion['MUNICIPIO']
+            direccionCliente.CP = nueva_direccion['CP']
+
+            direccionCliente.save()
             
             return Response(serializer.data)
         return Response(serializer.errors)
