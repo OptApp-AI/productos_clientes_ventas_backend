@@ -2,81 +2,89 @@ from django.shortcuts import render
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 from rest_framework import status
-from .models import Producto, Cliente, PrecioCliente, Venta, ProductoVenta, Direccion
-from .serializers import ProductoSerializer, ClienteSerializer, PrecioClienteSerializer, VentaSerializer, ProductoVentaSerializer, UserSerializer
+from .models import Producto, Cliente, PrecioCliente, Venta, ProductoVenta, Direccion, Empleado
+from .serializers import ProductoSerializer, ClienteSerializer, VentaSerializer, ProductoVentaSerializer, UserSerializer
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.contrib.auth.models import User 
+from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
-
-
 
 
 @api_view(['GET'])
 def cuenta_detail(request):
     # the first line of code retrieves the User object associated with the current request by accessing the user attribute of the request object. The request.user attribute is automatically populated by Django's authentication middleware, which verifies the user's credentials based on the authentication backend that is configured in the Django settings.
-    user = request.user 
+    user = request.user
 
     serializer = UserSerializer(user)
 
     return Response(serializer.data)
 
-@api_view(['POST'])
-def modificar_cuenta(request):
 
+@api_view(['PUT'])
+def modificar_cuenta(request):
     user = request.user
 
     if isinstance(user, AnonymousUser):
-
         return Response({'Detalles': 'Necesitar autenticarte para modificar tu usuario'})
 
-    data = request.data 
+    data = request.data
+    password = data.get('password')
+    imagen = data.get('IMAGEN')
 
-    if data['password1'] != data['password2']:
-        return Response({'Detalles': 'Las constraseñas deben ser iguales'})
-    
     try:
         user.username = data['username']
-        user.password = make_password(data['password1'])
+        if password:
+            user.password = make_password(password)
         user.first_name = data['name']
-        user.is_staff = data['is_admin']
+        user.is_staff = True if data['is_admin'] == "true" else False
 
         user.save()
 
+        if imagen:
+            empleado = user.empleado
+            empleado.IMAGEN = data['IMAGEN']
+            empleado.save()
+
         serializer = UserSerializer(user)
         return Response(serializer.data)
-    
+
     except:
-        return Response({'Detalles': 'Un usuario con este username ya existe'}, status=status.HTTP_400_BAD_REQUEST) 
+        return Response({'Detalles': 'Un usuario con este username ya existe'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['POST'])
 def crear_user(request):
 
-    data = request.data 
-
-
-    is_admin = data['is_admin']
-    print('',)
-
-    print(is_admin == False, is_admin)
+    data = request.data
 
     if data['password1'] != data['password2']:
         return Response({'Detalles': 'Las constraseñas deben ser iguales'}, status=status.HTTP_400_BAD_REQUEST)
-    
+
     try:
+
         user = User.objects.create(
-        username = data['username'],
-        password=make_password(data['password1']),
-        first_name=data['name'],
-        is_staff =True if data['is_admin'] == "true" else False
-    )
+            username=data['username'],
+            password=make_password(data['password1']),
+            first_name=data['name'],
+            is_staff=True if data['is_admin'] == "true" else False
+        )
+
+        if data.get('IMAGEN'):
+            Empleado.objects.create(
+                USUARIO=user,
+                IMAGEN=data['IMAGEN'],
+            )
+        else:
+            Empleado.objects.create(
+                USUARIO=user
+            )
 
         serializer = UserSerializer(user)
         return Response(serializer.data)
-    
+
     except:
-        return Response({'Detalles': 'Un usuario con este username ya existe'}, status=status.HTTP_400_BAD_REQUEST) 
+        return Response({'Detalles': 'Un usuario con este username ya existe'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
@@ -96,29 +104,29 @@ def usuario_detail(request, pk):
         usuario = User.objects.get(pk=pk)
     except User.DoesNotExist:
         return Response({"Detalles": 'El usuario no existe'}, status=status.HTTP_404_NOT_FOUND)
-    
+
     serializer = UserSerializer(usuario)
     return Response(serializer.data)
-    
-    
+
+
 @api_view(['PUT', 'DELETE'])
 def modificar_usuario(request, pk):
 
-    data = request.data 
+    data = request.data
     try:
         usuario = User.objects.get(pk=pk)
     except User.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    
+
     if request.method == 'PUT':
-        
+
         usuario.is_staff = True if data['is_admin'] == "true" else False
         usuario.save()
 
         serializer = UserSerializer(usuario)
 
         return Response(serializer.data)
-    
+
     if request.method == 'DELETE':
         usuario.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -131,18 +139,18 @@ class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     #     # Add custom claims
     #     token['username'] = user.username
-    
+
     #     return token
-    
+
     def validate(self, attrs):
         data = super().validate(attrs)
-    
-        serializer = UserSerializer(self.user).data 
+
+        serializer = UserSerializer(self.user).data
 
         for k, v in serializer.items():
-            data[k] = v 
+            data[k] = v
 
-        return data 
+        return data
 
 
 class MyTokenObtainPairView(TokenObtainPairView):
@@ -160,6 +168,7 @@ def producto_list(request):
 
     return Response(serializer.data)
 
+
 @api_view(['POST'])
 def crear_producto(request):
 
@@ -175,18 +184,17 @@ def crear_producto(request):
         for cliente_serializer in clientes_serializer.data:
 
             precio_cliente = PrecioCliente.objects.create(
-                CLIENTE = Cliente.objects.get(pk = cliente_serializer["id"]),
-                PRODUCTO = producto,
-                PRECIO = producto.PRECIO
+                CLIENTE=Cliente.objects.get(pk=cliente_serializer["id"]),
+                PRODUCTO=producto,
+                PRECIO=producto.PRECIO
             )
 
             precio_cliente.save()
 
-
         return Response(serializer.data)
     print(serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 @api_view(['GET'])
 def producto_detail(request, pk):
@@ -195,9 +203,10 @@ def producto_detail(request, pk):
         producto = Producto.objects.get(pk=pk)
     except Producto.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    
+
     serializer = ProductoSerializer(producto)
     return Response(serializer.data)
+
 
 @api_view(['PUT', 'DELETE'])
 def modificar_producto(request, pk):
@@ -206,7 +215,7 @@ def modificar_producto(request, pk):
         producto = Producto.objects.get(pk=pk)
     except Producto.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    
+
     if request.method == 'PUT':
         serializer = ProductoSerializer(producto, data=request.data)
         if serializer.is_valid():
@@ -214,11 +223,11 @@ def modificar_producto(request, pk):
             return Response(serializer.data)
         print(serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     elif request.method == 'DELETE':
         producto.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT) 
-    
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 # Vistas para clientes
 @api_view(['GET'])
@@ -228,14 +237,15 @@ def cliente_list(request):
     serializer = ClienteSerializer(queryset, many=True)
     return Response(serializer.data)
 
+
 @api_view(['POST'])
 def crear_cliente(request):
 
-    data = request.data 
+    data = request.data
 
     # Crear cliente
     serializer = ClienteSerializer(data=data)
-    
+
     if serializer.is_valid():
         cliente = serializer.save()
 
@@ -244,18 +254,18 @@ def crear_cliente(request):
         for precio_cliente in precios_cliente:
 
             nuevo_precio_cliente = PrecioCliente.objects.create(
-                CLIENTE = cliente, 
-                PRODUCTO = Producto.objects.get(pk = precio_cliente["productoId"]), 
-                PRECIO = precio_cliente['precioCliente']
+                CLIENTE=cliente,
+                PRODUCTO=Producto.objects.get(pk=precio_cliente["productoId"]),
+                PRECIO=precio_cliente['precioCliente']
             )
 
             nuevo_precio_cliente.save()
-        
-        # Crear direccion 
+
+        # Crear direccion
         direccion = data['direccion']
 
         nueva_direccion = Direccion.objects.create(**direccion)
-        
+
         nueva_direccion.save()
 
         cliente.DIRECCION = nueva_direccion
@@ -266,7 +276,8 @@ def crear_cliente(request):
         return Response(serializer.data)
     print(serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-            
+
+
 @api_view(['GET'])
 def cliente_detail(request, pk):
 
@@ -274,20 +285,21 @@ def cliente_detail(request, pk):
         cliente = Cliente.objects.get(pk=pk)
     except Cliente.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    
+
     serializer = ClienteSerializer(cliente)
     return Response(serializer.data)
-    
+
+
 @api_view(['PUT', 'DELETE'])
 def modificar_cliente(request, pk):
 
-    try: 
+    try:
         cliente = Cliente.objects.get(pk=pk)
     except Cliente.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
-    
+
     if request.method == 'PUT':
-        data = request.data 
+        data = request.data
 
         serializer = ClienteSerializer(cliente, data=data)
 
@@ -299,14 +311,16 @@ def modificar_cliente(request, pk):
 
             for nuevo_precio_cliente in nuevos_precios_cliente:
 
-                precioCliente = PrecioCliente.objects.get(pk=nuevo_precio_cliente["precioClienteId"])
+                precioCliente = PrecioCliente.objects.get(
+                    pk=nuevo_precio_cliente["precioClienteId"])
                 precioCliente.PRECIO = nuevo_precio_cliente["nuevoPrecioCliente"]
                 precioCliente.save()
 
             # Modificar la direccion
             nueva_direccion = data['nuevaDireccion']
 
-            direccionCliente = Direccion.objects.get(pk = nueva_direccion['direccionClienteId'])
+            direccionCliente = Direccion.objects.get(
+                pk=nueva_direccion['direccionClienteId'])
 
             direccionCliente.CALLE = nueva_direccion['CALLE']
             direccionCliente.NUMERO = nueva_direccion['NUMERO']
@@ -316,10 +330,10 @@ def modificar_cliente(request, pk):
             direccionCliente.CP = nueva_direccion['CP']
 
             direccionCliente.save()
-            
+
             return Response(serializer.data)
         return Response(serializer.errors)
-    
+
     elif request.method == 'DELETE':
         cliente.delete()
 
@@ -336,10 +350,11 @@ def venta_list(request):
 
     return Response(serializer.data)
 
+
 @api_view(['POST'])
 def crear_venta(request):
 
-    data = request.data 
+    data = request.data
 
     serializer = VentaSerializer(data=data)
 
@@ -353,31 +368,28 @@ def crear_venta(request):
             producto = Producto.objects.get(pk=producto_venta["productoId"])
 
             nuevo_producto_venta = ProductoVenta.objects.create(
-                VENTA = venta,
-                PRODUCTO = producto,
-                CANTIDAD_VENTA = producto_venta["cantidadVenta"],
-                PRECIO_VENTA = producto_venta["precioVenta"],
+                VENTA=venta,
+                PRODUCTO=producto,
+                CANTIDAD_VENTA=producto_venta["cantidadVenta"],
+                PRECIO_VENTA=producto_venta["precioVenta"],
             )
 
-            if data["STATUS"] == "REALIZADO": 
+            if data["STATUS"] == "REALIZADO":
                 producto.CANTIDAD -= nuevo_producto_venta.CANTIDAD_VENTA
                 producto.save()
 
             nuevo_producto_venta.save()
 
-
-        
         return Response(serializer.data)
     return Response(serializer.errors)
 
+
 @api_view(['GET'])
 def venta_detail(request, pk):
-    
-    
 
     try:
         venta = Venta.objects.get(pk=pk)
-        
+
     except Venta.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -387,10 +399,10 @@ def venta_detail(request, pk):
 
 @api_view(['PUT', 'DELETE'])
 def modificar_venta(request, pk):
-    
+
     try:
         venta = Venta.objects.get(pk=pk)
-        
+
     except Venta.DoesNotExist:
         return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -404,26 +416,26 @@ def modificar_venta(request, pk):
         status_cambios = {"ANTES": status_actual}
 
         status_nuevo = data["STATUS"]
-        
-        productos_venta = venta.productos_venta 
+
+        productos_venta = venta.productos_venta
 
         serializer = ProductoVentaSerializer(productos_venta, many=True)
-        
+
         for producto_venta_serializer in serializer.data:
 
-            producto = Producto.objects.get(NOMBRE = producto_venta_serializer["producto_nombre"])
-            
-            producto_cambios= {"ANTES": producto.CANTIDAD}
+            producto = Producto.objects.get(
+                NOMBRE=producto_venta_serializer["producto_nombre"])
+
+            producto_cambios = {"ANTES": producto.CANTIDAD}
 
             cantidad_venta = producto_venta_serializer["CANTIDAD_VENTA"]
 
-            producto.CANTIDAD = calcular_cantidad(status_actual, status_nuevo, producto.CANTIDAD, cantidad_venta)
+            producto.CANTIDAD = calcular_cantidad(
+                status_actual, status_nuevo, producto.CANTIDAD, cantidad_venta)
             producto.save()
             producto_cambios["DESPUES"] = producto.CANTIDAD
 
             reporte_cambios[producto.NOMBRE] = producto_cambios
-
-            
 
         venta.STATUS = status_nuevo
         venta.save()
@@ -434,7 +446,7 @@ def modificar_venta(request, pk):
 
     elif request.method == 'DELETE':
         venta.delete()
-        return Response(status = status.HTTP_204_NO_CONTENT)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def calcular_cantidad(status_actual, status, cantidad_antes, cantidad_venta):
@@ -447,8 +459,7 @@ def calcular_cantidad(status_actual, status, cantidad_antes, cantidad_venta):
     elif status_actual == "REALIZADO":
         if status in ["PENDIENTE", "CANCELADO"]:
             return cantidad_antes + cantidad_venta
-        else: 
+        else:
             return cantidad_antes
     else:
         return cantidad_antes
-
