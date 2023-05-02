@@ -16,5 +16,4 @@ log/
 *.sqlite3
 
 # Ignorar archivos de media
-media/
 static/
