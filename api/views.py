@@ -9,6 +9,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth.models import User
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import AnonymousUser
+import sys
 
 
 @api_view(['GET'])
@@ -36,7 +37,7 @@ def modificar_cuenta(request):
         user.username = data['username']
         if password:
             user.password = make_password(password)
-        user.first_name = data['name']
+        user.first_name = data['name'].upper()
         user.is_staff = True if data['is_admin'] == "true" else False
 
         user.save()
@@ -66,7 +67,7 @@ def crear_user(request):
         user = User.objects.create(
             username=data['username'],
             password=make_password(data['password1']),
-            first_name=data['name'],
+            first_name=data['name'].upper(),
             is_staff=True if data['is_admin'] == "true" else False
         )
 
@@ -83,7 +84,9 @@ def crear_user(request):
         serializer = UserSerializer(user)
         return Response(serializer.data)
 
-    except:
+    except Exception as e:
+        # print("Error:", str(e))
+        # print("Detalles del error:", sys.exc_info())
         return Response({'Detalles': 'Un usuario con este username ya existe'}, status=status.HTTP_400_BAD_REQUEST)
 
 
