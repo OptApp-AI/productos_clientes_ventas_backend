@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-i*u6)d2zmlp+*we=o$92zdaqf-wl#3k%xzmfsga3vfal=3@*f^
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['89.116.52.95']
 
 
 # Application definition
@@ -90,8 +90,12 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'u343076360_Gran_Pacifico',
+        'USER': 'u343076360_OscarG',
+        'PASSWORD': 'Y3kVufq+*&o=',
+        'HOST': '151.106.97.204',
+        'PORT': '3306',
     }
 }
 
@@ -156,3 +160,6 @@ REST_FRAMEWORK = {
 
 
 CORS_ALLOW_ALL_ORIGINS = True
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+SECURE_SSL_REDIRECT = False
