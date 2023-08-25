@@ -277,8 +277,6 @@ def cliente_list(request):
         {"clientes": serializer.data, "page": page, "pages": paginator.num_pages}
     )
 
-    serializer = ClienteSerializer(queryset, many=True)
-    return Response(serializer.data)
 
 
 @api_view(["POST"])
