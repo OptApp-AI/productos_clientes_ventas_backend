@@ -3,6 +3,7 @@
 .venv
 *.pyc
 __pycache__/
+/venv
 
 # Ignorar archivos generados por el sistema
 .DS_Store
