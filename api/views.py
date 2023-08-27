@@ -278,7 +278,6 @@ def cliente_list(request):
     )
 
 
-
 @api_view(["POST"])
 def crear_cliente(request):
     data = request.data
@@ -383,23 +382,23 @@ def modificar_cliente(request, pk):
 def venta_list(request):
     queryset = Venta.objects.all().order_by("-FECHA")
 
-    page = request.query_params.get("page")
+    page = request.query_params.get("page", 1)  # Default to 1 if page is None
+
+    try:
+        page = int(page)  # Convert to int here to catch ValueError early
+    except ValueError:
+        return Response(
+            {"error": "Invalid page number"}, status=status.HTTP_400_BAD_REQUEST
+        )
 
     paginator = Paginator(queryset, 10)
 
     try:
         ventas = paginator.page(page)
-
     except PageNotAnInteger:
         ventas = paginator.page(1)
-
     except EmptyPage:
         ventas = paginator.page(paginator.num_pages)
-
-    if page == None:
-        page = 1
-
-    page = int(page)
 
     serializer = VentaSerializer(ventas, many=True)
 
