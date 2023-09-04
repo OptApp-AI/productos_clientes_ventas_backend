@@ -79,7 +79,7 @@ def venta_list(request):
     # 4. Paginacion
     page = request.GET.get("page")
 
-    paginator = Paginator(queryset, 5)
+    paginator = Paginator(queryset, 10)
 
     try:
         ventas = paginator.page(page)
