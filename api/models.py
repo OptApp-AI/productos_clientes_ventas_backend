@@ -1,6 +1,7 @@
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 
 
 class Empleado(models.Model):
@@ -82,11 +83,27 @@ class Cliente(models.Model):
 
     OBSERVACIONES = models.CharField(max_length=200, blank=True)
 
+    # Un cliente puede tener muchas rutas
+    RUTAS = models.ManyToManyField("Ruta", blank=True, related_name="clientes_ruta")
+
     def save(self, *args, **kwargs):
         self.NOMBRE = self.NOMBRE.upper()
         if self.CONTACTO:
             self.CONTACTO = self.CONTACTO.upper()
+
+        # Save the Cliente instance first
         super().save(*args, **kwargs)
+
+    # el panel de administración de Django, que lo llama automáticamente antes de guardar.
+
+    def clean(self):
+        super(Cliente, self).clean()  # Esto es opcional pero es una buena práctica.
+        routes = self.RUTAS.all()
+        route_names = [ruta.NOMBRE for ruta in routes]
+        if len(set(route_names)) > 1:
+            raise ValidationError(
+                "All routes associated with a client must have the same name."
+            )
 
     def delete(self, *args, **kwargs):
         # Delete the associated Direccion if it exists
@@ -173,3 +190,163 @@ class ProductoVenta(models.Model):
 
     def __str__(self):
         return f"{self.VENTA}, {self.NOMBRE_PRODUCTO}"
+
+
+# RUTA
+
+
+class Ruta(models.Model):
+    NOMBRE = models.CharField(max_length=100)
+
+    # Si vamos a crear una ruta por cada dia. Al momento de registrar un usuario con una casilla le damos a escoger al usuario que dias de la ruta se deben considerar. Como ya existen los siete dias para esa ruta (o las siete rutas en realidad) solo es cosa de anadir el ciente a todas esas rutas
+
+    # un cliente puede tener muchas rutas
+
+    # Al momento de crear una ruta en realidad se cran siete, una por cada dia
+    #
+    # Debe ser posible eliminar todos los clientes en una ruta (los siete dias) o en cualquiera de los siete dias de esa ruta.
+
+    DIA = models.CharField(
+        max_length=100,
+        choices=(
+            ("LUNES", "LUNES"),
+            ("MARTES", "MARTES"),
+            ("MIERCOLES", "MIERCOLES"),
+            ("JUEVES", "JUEVES"),
+            ("VIERNES", "VIERNES"),
+            ("SABADO", "SABADO"),
+            ("DOMINGO", "DOMINGO"),
+        ),
+    )
+
+    # Cambiar esto por una instancia de Empleado. This ensures that the repartidor must exist in the Empleado
+    REPARTIDOR = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True)
+    REPARTIDOR_NOMBRE = models.CharField(max_length=200)
+
+    def save(self, *args, **kwargs):
+        # Transform NAME to uppercase
+        self.NOMBRE = self.NOMBRE.upper()
+        self.REPARTIDOR_NOMBRE = self.REPARTIDOR_NOMBRE.upper()
+        # Check for other Ruta instances with the same NOMBRE and DIA
+        existing_route = (
+            Ruta.objects.filter(NOMBRE=self.NOMBRE, DIA=self.DIA)
+            .exclude(pk=self.pk)
+            .first()
+        )
+        if existing_route:
+            raise ValidationError(
+                f"A route with the name '{self.NOMBRE}' and day '{self.DIA}' already exists."
+            )
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.NOMBRE}, {self.DIA}"
+
+
+# 1. LOS PRODUCTOS DE SALIDA A RUTA SE RETIRAN DEL STOCK SIEMPRE. NO IMPORTA EL STATUS
+# 2. EXISTEN LOS MISMOS TRES STATUS: PENDIENTE, REALIZADO, CANCELADO. SIEMPRE SE GENERA CON STATUS PENDIENTE
+# 3. EN GENERAL LOS CAMPOS SON SIMIILARES (ATIENDE, FECHA, OBSERVACIONES, ETC.)
+# 5. SE PUEDEN HACER DEVOLUCIONES. LAS DEVOLUCIONES LAS PUEDEN HACER CAJEROS (LUEGO VEMOS A LOS ADMIS)
+# 6. AL HACER ESTO SE GENERA UNA DEVOLUCION CON STATUS DE PENDIENTE. SOLO HASTA QUE EL ADMI CAMBIA SU STATUS A REALIZADO ES QUE SE REGRESAN LOS PRODUCTOS AL STOCK
+# ESTA ES UNA PREGUNTA IMPORTANTE ¿DEBERIAN DE REGRESARSE LOS PRODUCTOS AL STOCK EN EL MOMENTO QUE EL CAJERO REALIZA LA DEVOLUCION, O ESPERAMOS HASTA QUE EL ADMIN LA AUTORIZA?
+# 7. CUANDO EL CAJERO ENTRE A LA SALIDARUTA, SOLO PUEDE DEVOLVER LOS PRODUCTOS CON STATUS DE CARGADO
+class SalidaRuta(models.Model):
+    ATIENDE = models.CharField(max_length=100)
+    # RUTA = models.ForeignKey(Ruta, on_delete=models.SET_NULL, null=True)
+    FECHA = models.DateTimeField(auto_now=True)
+
+    # Aquí cambiar esto por un Empleado. PARA QUE QUIERES AL EMPLEADO, NECESITAS ACCEDER A ALGUN DATOS DEL EMPLEADO DESDE LA SALIDA RUTA
+    # CUANDO EL REPARTIDOR INICIE SESSION, COMO VA A HACERDER A LA SalidRuta. DEBERIA DE TENER SOLO UNA SalidaRuta con STATUS de pendiente o progreso, y es a traves de este campo que el va a acceder.
+    REPARTIDOR = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True)
+    # REPARTIDOR_NOMBRE
+    # Si hubo una devolucion en esta salida a ruta el administrador va a hacer la devolucion aqui
+    OBSERVACIONES = models.CharField(max_length=200)
+    STATUS = models.CharField(
+        max_length=100,
+        choices=(
+            # Sale como pendiente mientras no venta todos los productos. Si al final del corte hay productos y se requiere una devolucion. Es necesario hacer una devolucion para cambiar el status a realizado. O bien, se pueden cancelar.
+            ("PENDIENTE", "PENDIENTE"),
+            ("PROGRESO", "PROGRESO"),
+            # Cambia a realizado cuando vendio todos los productos
+            # Cada vez que se vende un ProductoSalidaRuta de esta salida ruta se verifica esto para ver si se debe cambiar
+            ("REALIZADO", "REALIZADO"),
+            # Se puede cancelar y todos los productos se regresan al almacen. Todos los ProductoSalidaRuta y ClienteSalidaRuta se cancelan.
+            #  NO ES POSIBLE CANCELAR SI YA SE VENDIO ALGO
+            ("CANCELADO", "CANCELADO"),
+        ),
+    )
+
+    def __str__(self):
+        # DESPUES HAY QUE CAMBIAR ESTO PORQUE SI SE BORRA EL ATIENDE O REPARTIDOR VAN A EXISTIR PROBLEMAS. nO EN REALIDAD PORQUE ATIENDE ES UN CHARFIELD, usar empleado_nombre EN LUGAR DE EMPLEADO, para uqe no haya problemas
+        return f"{self.ATIENDE}, {self.REPARTIDOR}"
+
+
+# El status cambia a vendido hasta que todo el producto se vendio
+class ProductoSalidaRuta(models.Model):
+    # Si la salida a ruta se cancela los ProductoSalidaRuta se cancelan
+    SALIDA_RUTA = models.ForeignKey(
+        SalidaRuta, on_delete=models.CASCADE, related_name="salida_ruta_productos"
+    )
+    # Aqui si usamos el objeto producto porque sera necesario acceder a este para hacer las devoluciones
+    PRODUCTO_RUTA = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    PRODUCTO_NOMBRE = models.CharField(max_length=200)
+    CANTIDAD_RUTA = models.IntegerField(validators=[MinValueValidator(1)])
+    CANTIDAD_DISPONIBLE = models.IntegerField(validators=[MinValueValidator(0)])
+    # SI CANCELAN LA SALIDARUTA LOS PRODUCTOS SE CANCELAN TAMBIEN. Una devolucion tambien ocasiona que los productos se cancelen
+    # CANCELAR UN PRODUCTO ES LO QUE USARE PARA REGRESAR EL PRODUCTO AL STOCK
+
+    # REMOVER ESTE CAMPO
+    STATUS = models.CharField(
+        max_length=100,
+        choices=(
+            ("CARGADO", "CARGADO"),
+            ("VENDIDO", "VENDIDO"),
+            ("CANCELADO", "CANCELADO"),
+        ),
+    )
+
+    def __str__(self):
+        return f"{self.SALIDA_RUTA}, {self.PRODUCTO_NOMBRE}"
+
+
+# No tiene el precio, pero accede a ellos mediante su hermano PrecioCliente.
+class ClienteSalidaRuta(models.Model):
+    # Si la salida ruta se cancela los ClienteSalidaRuta se eliminan
+    SALIDA_RUTA = models.ForeignKey(
+        SalidaRuta, on_delete=models.CASCADE, related_name="salida_ruta_clientes"
+    )
+    # Aqui no uso el objeto cliente porque no ocupo acceder a el para nada. Por ejemplo, no hay que regresar clientes al sotck. Con su nombre me basta (NO ES CORRECTO)
+    # LA RAZON POR LA QUE USO EL OBJETO CLIENTE Y NO UN NOMBRE, ES PORQUE EL TENER A FOREIG KEY AL OBJETO CLIENTE ME PERMITE ACCEDER A LOS HERMANOS DE CLIENTESALIDARUTA, ES DECIR, ME PERMITE ACCEDER A LOS PRECIOSCLIENTE
+    # LO OTRO QUE QUERÍAS HACER NO FUNCIONARIA SI CAMBIAN EL PRECIO DEL CLIENTE Y LA SALIDARUTA YA SE REGISTRO CON PRECIOS ANTERIORES
+    CLIENTE_RUTA = models.ForeignKey(Cliente, on_delete=models.SET_NULL, null=True)
+    CLIENTE_NOMBRE = models.CharField(max_length=200)
+    STATUS = models.CharField(
+        max_length=100,
+        choices=(
+            ("PENDIENTE", "PENDIENTE"),
+            ("VISITADO", "VISITADO"),
+            ("CANCELADO", "CANCELADO"),
+        ),
+    )
+
+    def __str__(self):
+        return f"{self.SALIDA_RUTA}, {self.CLIENTE_RUTA}"
+
+
+class DevolucionSalidaRuta(models.Model):
+    REPARTIDOR = models.CharField(max_length=200)
+    ATIENDE = models.CharField(max_length=200)
+    ADMINISTRADOR = models.CharField(max_length=200, blank=True)
+    SALIDA_RUTA = models.ForeignKey(
+        SalidaRuta, on_delete=models.CASCADE, related_name="salida_ruta_devoluciones"
+    )
+    PRODUCTO_DEVOLUCION = models.ForeignKey(Producto, on_delete=models.CASCADE)
+    PRODUCTO_NOMBRE = models.CharField(max_length=200)
+    CATIDAD_DEVOLUCION = models.IntegerField(validators=[MinValueValidator(1)])
+    # La cajera realiza la devolución, pero mientras el administrador no la autorice, el STATUS permanece como pendiente y la cajera no puede realizar el corte
+    STATUS = models.CharField(
+        max_length=200, choices=(("REALIZADO", "REALIZADO"), ("PENDIENTE", "PENDIENTE"))
+    )
+
+    def __str__(self):
+        return f"{self.SALIDA_RUTA}, {self.CATIDAD_DEVOLUCION}"

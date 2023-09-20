@@ -7,7 +7,13 @@ from .models import (
     ProductoVenta,
     Direccion,
     Empleado,
+    # Rutas
+    Ruta,
+    SalidaRuta,
+    ClienteSalidaRuta,
+    ProductoSalidaRuta,
 )
+
 
 # Register your models here.
 
@@ -23,3 +29,9 @@ admin.site.register(Venta)
 admin.site.register(ProductoVenta)
 admin.site.register(Direccion)
 admin.site.register(Empleado, EmpleadoAdmin)
+
+# Ruta
+admin.site.register(Ruta)
+admin.site.register(SalidaRuta)
+admin.site.register(ClienteSalidaRuta)
+admin.site.register(ProductoSalidaRuta)

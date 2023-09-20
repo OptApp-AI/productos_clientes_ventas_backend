@@ -6,10 +6,14 @@ from api.models import (
     Cliente,
     PrecioCliente,
     Direccion,
+    # Ruta
+    Ruta,
 )
 from api.serializers import (
     ClienteSerializer,
     ClienteVentaSerializer,
+    # Ruta
+    RutaSerializer,
 )
 from django.db.models import Case, When, Value, IntegerField
 from django.db.models import Case, When, Value, IntegerField
@@ -114,6 +118,8 @@ def crear_cliente(request):
 
         # Es importante tener en cuenta que, aunque creas los objetos PrecioCliente después de haber validado y serializado el objeto Cliente, estos objetos estarán disponibles en la instancia del objeto Cliente y se incluirán en la respuesta cuando se serialice el objeto Cliente utilizando el serializer ClienteSerializer.
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    print(serializer.errors)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -185,3 +191,62 @@ def modificar_cliente(request, pk):
             {"message": "Cliente fue eliminado exitosamente"},
             status=status.HTTP_204_NO_CONTENT,
         )
+
+
+# Rutas
+
+
+@api_view(["GET"])
+def ruta_list(request):
+    rutas = Ruta.objects.all()
+
+    serializer = RutaSerializer(rutas, many=True)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["POST"])
+def crear_ruta(request):
+    serializer = RutaSerializer(data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    print(serializer.errors)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(["GET"])
+def ruta_detail(request, pk):
+    try:
+        ruta = Ruta.objects.get(id=pk)
+    except Ruta.DoesNotExist:
+        return Response(
+            {"message": "Ruta con el id dado no existe"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = RutaSerializer(ruta)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["PUT"])
+def modificar_ruta(request, pk):
+    try:
+        ruta = Ruta.objects.get(id=pk)
+    except Ruta.DoesNotExist:
+        return Response(
+            {"message": "Ruta con el id dado no existe"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    serializer = RutaSerializer(instance=ruta, data=request.data)
+
+    if serializer.is_valid():
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    print(serializer.errors)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -29,19 +29,18 @@ def crear_producto(request):
         producto = serializer.save()
 
         # 2. Crear un precio cliente para cada cliente existente usando el precio del producto
-        queryset = Cliente.objects.all()
 
-        # Creo que es necesario serializar para poder iterar sobre las instancias de Cliente
-        clientes_serializer = ClienteSerializer(queryset, many=True)
+        # Obtener la lista de todos los clientes
+        clientes = Cliente.objects.all()
 
-        # Cuando iteres recuerda usar .data
-        for cliente_serializer in clientes_serializer.data:
-            precio_cliente = PrecioCliente.objects.create(
-                CLIENTE=Cliente.objects.get(pk=cliente_serializer["id"]),
-                PRODUCTO=producto,
-                PRECIO=producto.PRECIO,  # Asignamos el precio default del producto a cada precio cliente
-            )
-            precio_cliente.save()
+        # Crear una lista de objetos PrecioCliente para insertar en lote
+        precios_clientes = [
+            PrecioCliente(CLIENTE=cliente, PRODUCTO=producto, PRECIO=producto.PRECIO)
+            for cliente in clientes
+        ]
+
+        # Insertar los objetos en lote
+        PrecioCliente.objects.bulk_create(precios_clientes)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
