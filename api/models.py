@@ -241,15 +241,18 @@ class RutaDia(models.Model):
 # 7. CUANDO EL CAJERO ENTRE A LA SALIDARUTA, SOLO PUEDE DEVOLVER LOS PRODUCTOS CON STATUS DE CARGADO
 class SalidaRuta(models.Model):
     ATIENDE = models.CharField(max_length=100)
-    # RUTA = models.ForeignKey(Ruta, on_delete=models.SET_NULL, null=True)
+    RUTA = models.ForeignKey(
+        RutaDia, on_delete=models.SET_NULL, null=True, related_name="salida_rutas"
+    )
+    RUTA_NOMBRE = models.CharField(max_length=200)
     FECHA = models.DateTimeField(auto_now=True)
 
     # Aquí cambiar esto por un Empleado. PARA QUE QUIERES AL EMPLEADO, NECESITAS ACCEDER A ALGUN DATOS DEL EMPLEADO DESDE LA SALIDA RUTA
     # CUANDO EL REPARTIDOR INICIE SESSION, COMO VA A HACERDER A LA SalidRuta. DEBERIA DE TENER SOLO UNA SalidaRuta con STATUS de pendiente o progreso, y es a traves de este campo que el va a acceder.
     REPARTIDOR = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True)
-    # REPARTIDOR_NOMBRE
+    REPARTIDOR_NOMBRE = models.CharField(max_length=200)
     # Si hubo una devolucion en esta salida a ruta el administrador va a hacer la devolucion aqui
-    OBSERVACIONES = models.CharField(max_length=200)
+    OBSERVACIONES = models.CharField(max_length=200, blank=True)
     STATUS = models.CharField(
         max_length=100,
         choices=(
@@ -274,12 +277,12 @@ class SalidaRuta(models.Model):
 class ProductoSalidaRuta(models.Model):
     # Si la salida a ruta se cancela los ProductoSalidaRuta se cancelan
     SALIDA_RUTA = models.ForeignKey(
-        SalidaRuta, on_delete=models.CASCADE, related_name="salida_ruta_productos"
+        SalidaRuta, on_delete=models.CASCADE, related_name="productos"
     )
     # Aqui si usamos el objeto producto porque sera necesario acceder a este para hacer las devoluciones
     PRODUCTO_RUTA = models.ForeignKey(Producto, on_delete=models.CASCADE)
     PRODUCTO_NOMBRE = models.CharField(max_length=200)
-    CANTIDAD_RUTA = models.IntegerField(validators=[MinValueValidator(1)])
+    CANTIDAD_RUTA = models.IntegerField(validators=[MinValueValidator(0)])
     CANTIDAD_DISPONIBLE = models.IntegerField(validators=[MinValueValidator(0)])
     # SI CANCELAN LA SALIDARUTA LOS PRODUCTOS SE CANCELAN TAMBIEN. Una devolucion tambien ocasiona que los productos se cancelen
     # CANCELAR UN PRODUCTO ES LO QUE USARE PARA REGRESAR EL PRODUCTO AL STOCK
@@ -302,7 +305,7 @@ class ProductoSalidaRuta(models.Model):
 class ClienteSalidaRuta(models.Model):
     # Si la salida ruta se cancela los ClienteSalidaRuta se eliminan
     SALIDA_RUTA = models.ForeignKey(
-        SalidaRuta, on_delete=models.CASCADE, related_name="salida_ruta_clientes"
+        SalidaRuta, on_delete=models.CASCADE, related_name="clientes"
     )
     # Aqui no uso el objeto cliente porque no ocupo acceder a el para nada. Por ejemplo, no hay que regresar clientes al sotck. Con su nombre me basta (NO ES CORRECTO)
     # LA RAZON POR LA QUE USO EL OBJETO CLIENTE Y NO UN NOMBRE, ES PORQUE EL TENER A FOREIG KEY AL OBJETO CLIENTE ME PERMITE ACCEDER A LOS HERMANOS DE CLIENTESALIDARUTA, ES DECIR, ME PERMITE ACCEDER A LOS PRECIOSCLIENTE

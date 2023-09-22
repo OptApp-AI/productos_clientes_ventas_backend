@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/", include("api.urls.urls_clientes")),
     path("api/", include("api.urls.urls_ventas")),
     path("api/", include("api.urls.urls_usuarios")),
+    path("api/", include("api.urls.urls_salida_ruta")),
     # Login
     path("api/token/", views.MyTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

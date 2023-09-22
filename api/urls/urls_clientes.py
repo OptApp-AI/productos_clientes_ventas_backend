@@ -19,4 +19,5 @@ urlpatterns = [
     path("modificar-ruta/<str:pk>/", views_clientes.modificar_ruta),
     path("modificar-ruta-dia/<str:pk>/", views_clientes.modificar_ruta_dia),
     path("rutas-registrar-cliente/", views_clientes.rutas_registrar_cliente),
+    path("clientes-salida-ruta/<str:pk>/", views_clientes.clientes_salida_ruta_list),
 ]

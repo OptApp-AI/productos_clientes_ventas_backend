@@ -10,6 +10,9 @@ from .models import (
     # Ruta
     Ruta,
     RutaDia,
+    ProductoSalidaRuta,
+    ClienteSalidaRuta,
+    SalidaRuta,
 )
 from django.contrib.auth.models import User
 
@@ -112,7 +115,7 @@ class RutaRegistrarClienteSerializer(serializers.ModelSerializer):
         fields = ["NOMBRE", "ruta_dias"]
 
     def get_ruta_dias(self, obj):
-        return [{ruta_dia.DIA: ruta_dia.id} for ruta_dia in obj.ruta_dias.all()]
+        return {ruta_dia.DIA: ruta_dia.id for ruta_dia in obj.ruta_dias.all()}
 
 
 class ClienteSerializer(serializers.ModelSerializer):
@@ -121,6 +124,7 @@ class ClienteSerializer(serializers.ModelSerializer):
 
     DIRECCION = DireccionSerializer(required=False)
 
+    # Por que read only si dson un campo editable del cliente????
     RUTAS = RutaDiaSerializer(many=True, read_only=True)
 
     class Meta:
@@ -166,3 +170,63 @@ class VentaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Venta
         fields = "__all__"
+
+
+class ProductoSalidaRutaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductoSalidaRuta
+        fields = "__all__"
+
+
+class ClienteSalidaRutaSerializer(serializers.ModelSerializer):
+    # Accedemos a los atributos especificos de un hermano mediante un metodo
+    precios_cliente = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClienteSalidaRuta
+        fields = "__all__"
+
+    # Asi accedo a los atributos de un hermano desde el serializador
+    def get_precios_cliente(self, obj):
+        precios_cliente = []
+        # PrecioCliente es hermano de ClienteSalida porque los dos son hijos de Cliente
+
+        # Dame todos las instancias de PRecioCliente que son hijas de mi papa (Cliente)
+        for precio in PrecioCliente.objects.filter(CLIENTE=obj.CLIENTE_RUTA):
+            # Serializa a mi hermano
+            serializer = PrecioClienteSerializer(precio)
+            # Usa la informacion en mi hermano serializado para crear un objeto y agregarlo a precios_cliente
+            precios_cliente.append(
+                {
+                    "precio": serializer.data["PRECIO"],
+                    "producto_nombre": serializer.data["producto_nombre"],
+                    # "productoId": serializer.data['PRODUCTO'],
+                }
+            )
+            # precios_cliente.append(serializer.data)
+        return precios_cliente
+
+
+class SalidaRutaSerializer(serializers.ModelSerializer):
+    productos = ProductoSalidaRutaSerializer(many=True, read_only=True)
+
+    clientes = ClienteSalidaRutaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = SalidaRuta
+        fields = "__all__"
+
+
+class ClientesRealizarSalidaRutaSerializer(serializers.ModelSerializer):
+    clientes_ruta = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RutaDia
+        fields = ("clientes_ruta",)
+
+    def get_clientes_ruta(self, obj):
+        # Assuming obj is an instance of RutaDia, we can access its related Cliente instances
+        return [
+            {"nombre": cliente.NOMBRE, "id": cliente.id}
+            for cliente in obj.clientes_ruta.all()
+        ]
