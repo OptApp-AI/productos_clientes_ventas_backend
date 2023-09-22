@@ -13,5 +13,10 @@ urlpatterns = [
     path("rutas/", views_clientes.ruta_list),
     path("crear-ruta/", views_clientes.crear_ruta),
     path("rutas/<str:pk>/", views_clientes.ruta_detail),
+    path("rutas/<str:pk>/dias/", views_clientes.ruta_dias_list),
+    path("ruta-dias/<str:pk>/", views_clientes.ruta_dias_detail),
+    path("ruta-dias/<str:pk>/clientes/", views_clientes.clientes_ruta),
     path("modificar-ruta/<str:pk>/", views_clientes.modificar_ruta),
+    path("modificar-ruta-dia/<str:pk>/", views_clientes.modificar_ruta_dia),
+    path("rutas-registrar-cliente/", views_clientes.rutas_registrar_cliente),
 ]

@@ -57,9 +57,11 @@ class Direccion(models.Model):
 
     def save(self, *args, **kwargs):
         self.CALLE = self.CALLE.upper()
-        self.COLONIA = self.COLONIA.upper()
+        if self.COLONIA:
+            self.COLONIA = self.COLONIA.upper()
         self.CIUDAD = self.CIUDAD.upper()
-        self.MUNICIPIO = self.MUNICIPIO.upper()
+        if self.MUNICIPIO:
+            self.MUNICIPIO = self.MUNICIPIO.upper()
         super().save(*args, **kwargs)
 
 
@@ -84,7 +86,7 @@ class Cliente(models.Model):
     OBSERVACIONES = models.CharField(max_length=200, blank=True)
 
     # Un cliente puede tener muchas rutas
-    RUTAS = models.ManyToManyField("Ruta", blank=True, related_name="clientes_ruta")
+    RUTAS = models.ManyToManyField("RutaDia", blank=True, related_name="clientes_ruta")
 
     def save(self, *args, **kwargs):
         self.NOMBRE = self.NOMBRE.upper()
@@ -93,17 +95,6 @@ class Cliente(models.Model):
 
         # Save the Cliente instance first
         super().save(*args, **kwargs)
-
-    # el panel de administración de Django, que lo llama automáticamente antes de guardar.
-
-    def clean(self):
-        super(Cliente, self).clean()  # Esto es opcional pero es una buena práctica.
-        routes = self.RUTAS.all()
-        route_names = [ruta.NOMBRE for ruta in routes]
-        if len(set(route_names)) > 1:
-            raise ValidationError(
-                "All routes associated with a client must have the same name."
-            )
 
     def delete(self, *args, **kwargs):
         # Delete the associated Direccion if it exists
@@ -196,15 +187,27 @@ class ProductoVenta(models.Model):
 
 
 class Ruta(models.Model):
-    NOMBRE = models.CharField(max_length=100)
+    NOMBRE = models.CharField(max_length=100, unique=True)
 
-    # Si vamos a crear una ruta por cada dia. Al momento de registrar un usuario con una casilla le damos a escoger al usuario que dias de la ruta se deben considerar. Como ya existen los siete dias para esa ruta (o las siete rutas en realidad) solo es cosa de anadir el ciente a todas esas rutas
+    REPARTIDOR = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True)
+    REPARTIDOR_NOMBRE = models.CharField(max_length=200)
 
-    # un cliente puede tener muchas rutas
+    def save(self, *args, **kwargs):
+        # Transform NAME to uppercase
+        self.NOMBRE = self.NOMBRE.upper()
+        self.REPARTIDOR_NOMBRE = self.REPARTIDOR_NOMBRE.upper()
 
-    # Al momento de crear una ruta en realidad se cran siete, una por cada dia
-    #
-    # Debe ser posible eliminar todos los clientes en una ruta (los siete dias) o en cualquiera de los siete dias de esa ruta.
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.NOMBRE}, {self.REPARTIDOR_NOMBRE}"
+
+
+class RutaDia(models.Model):
+    RUTA = models.ForeignKey(Ruta, on_delete=models.CASCADE, related_name="ruta_dias")
+
+    REPARTIDOR = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True)
+    REPARTIDOR_NOMBRE = models.CharField(max_length=200)
 
     DIA = models.CharField(
         max_length=100,
@@ -219,28 +222,14 @@ class Ruta(models.Model):
         ),
     )
 
-    # Cambiar esto por una instancia de Empleado. This ensures that the repartidor must exist in the Empleado
-    REPARTIDOR = models.ForeignKey(Empleado, on_delete=models.SET_NULL, null=True)
-    REPARTIDOR_NOMBRE = models.CharField(max_length=200)
-
     def save(self, *args, **kwargs):
         # Transform NAME to uppercase
-        self.NOMBRE = self.NOMBRE.upper()
         self.REPARTIDOR_NOMBRE = self.REPARTIDOR_NOMBRE.upper()
-        # Check for other Ruta instances with the same NOMBRE and DIA
-        existing_route = (
-            Ruta.objects.filter(NOMBRE=self.NOMBRE, DIA=self.DIA)
-            .exclude(pk=self.pk)
-            .first()
-        )
-        if existing_route:
-            raise ValidationError(
-                f"A route with the name '{self.NOMBRE}' and day '{self.DIA}' already exists."
-            )
+
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.NOMBRE}, {self.DIA}"
+        return f"{self.RUTA.NOMBRE}, {self.DIA}, {self.REPARTIDOR_NOMBRE}"
 
 
 # 1. LOS PRODUCTOS DE SALIDA A RUTA SE RETIRAN DEL STOCK SIEMPRE. NO IMPORTA EL STATUS

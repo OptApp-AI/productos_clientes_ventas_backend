@@ -8,12 +8,16 @@ from api.models import (
     Direccion,
     # Ruta
     Ruta,
+    RutaDia,
 )
 from api.serializers import (
     ClienteSerializer,
     ClienteVentaSerializer,
     # Ruta
     RutaSerializer,
+    RutaDiaSerializer,
+    ClientesRutaSerializer,
+    RutaRegistrarClienteSerializer,
 )
 from django.db.models import Case, When, Value, IntegerField
 from django.db.models import Case, When, Value, IntegerField
@@ -232,7 +236,65 @@ def ruta_detail(request, pk):
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 
+@api_view(["GET"])
+def ruta_dias_list(request, pk):
+    ruta_dias = RutaDia.objects.filter(RUTA=pk)
+
+    serializer = RutaDiaSerializer(ruta_dias, many=True)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def ruta_dias_detail(request, pk):
+    try:
+        ruta_dia = RutaDia.objects.get(id=pk)
+    except RutaDia.DoesNotExist:
+        return Response({"message": "Ruta con el id dado no existe"})
+
+    serializer = RutaDiaSerializer(ruta_dia)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
 @api_view(["PUT"])
+def modificar_ruta_dia(request, pk):
+    try:
+        ruta_dia = RutaDia.objects.get(id=pk)
+    except RutaDia.DoesNotExist:
+        return Response(
+            {"message": "Ruta con el id dado no existe"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    data = request.data
+
+    # REPARTIDOR = data.get("REPARTIDOR")
+    # REPARTIDOR_NOMBRE = data.get("REPARTIDOR_NOMBRE")
+
+    # ruta_dia.REPARTIDOR = REPARTIDOR
+    # ruta_dia.REPARTIDOR_NOMBRE = REPARTIDOR_NOMBRE
+    # ruta_dia.save()
+
+    # return Response({"Ruta ha sido actualizada exitosamente"}, status=status.HTTP_200_OK)
+
+    serializer = RutaDiaSerializer(instance=ruta_dia, data=data)
+
+    if serializer.is_valid():
+        serializer.save()
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    print(serializer.errors)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# QUE CUANDO ELIMINES UNA RUTA TE DE LA OPCIÓN DE ELIMINAR TODAS LAS RUTAS ASOCIADAS,
+# SOLO UN ADMINISTRADOR PUEDE ELIMINAR LAS RUTAS (QUIZA NO, PORQUE LOS CAJEROS PASAN MAS TIEMPO USANDO Y CREANDO RUTAS)
+
+
+# CUANDO EDITAS EL NOMBRE DE LA RUTA TAMBIEN EDITAS EL NOMBRE DEL RESTO DE LAS RUTAS
+@api_view(["PUT", "DELETE"])
 def modificar_ruta(request, pk):
     try:
         ruta = Ruta.objects.get(id=pk)
@@ -242,11 +304,46 @@ def modificar_ruta(request, pk):
             status=status.HTTP_404_NOT_FOUND,
         )
 
-    serializer = RutaSerializer(instance=ruta, data=request.data)
+    if request.method == "PUT":
+        serializer = RutaSerializer(instance=ruta, data=request.data)
 
-    if serializer.is_valid():
-        serializer.save()
+        if serializer.is_valid():
+            serializer.save()
 
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    print(serializer.errors)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    if request.method == "DELETE":
+        ruta.delete()
+
+        return Response(
+            {"message": "Ruta ha sido eliminada exitosamente"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+
+@api_view(["GET"])
+def clientes_ruta(request, pk):
+    try:
+        ruta_dia = RutaDia.objects.get(id=pk)
+    except RutaDia.DoesNotExist:
+        return Response(
+            {"message": "Ruta con el id dado no existe"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+
+    # clientes = Cliente.objects.filter(RUTA=pk)
+
+    serializer = ClientesRutaSerializer(ruta_dia)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def rutas_registrar_cliente(request):
+    rutas = Ruta.objects.all()
+
+    serializer = RutaRegistrarClienteSerializer(rutas, many=True)
+
+    return Response(serializer.data, status=status.HTTP_200_OK)

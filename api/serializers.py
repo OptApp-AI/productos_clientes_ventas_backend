@@ -9,6 +9,7 @@ from .models import (
     Empleado,
     # Ruta
     Ruta,
+    RutaDia,
 )
 from django.contrib.auth.models import User
 
@@ -92,17 +93,51 @@ class RutaSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class RutaDiaSerializer(serializers.ModelSerializer):
+    NOMBRE = serializers.CharField(source="RUTA.NOMBRE", read_only=True)
+
+    # clientes_ruta = ClienteSerializer
+
+    class Meta:
+        model = RutaDia
+        fields = "__all__"
+        # exclude = ("RUTA",)
+
+
+class RutaRegistrarClienteSerializer(serializers.ModelSerializer):
+    ruta_dias = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Ruta
+        fields = ["NOMBRE", "ruta_dias"]
+
+    def get_ruta_dias(self, obj):
+        return [{ruta_dia.DIA: ruta_dia.id} for ruta_dia in obj.ruta_dias.all()]
+
+
 class ClienteSerializer(serializers.ModelSerializer):
     # Debo cambia el serializador de precios, remover producto_cantidad,  producto_imagen
     precios_cliente = PrecioClienteSerializer(many=True, read_only=True)
 
     DIRECCION = DireccionSerializer(required=False)
 
-    RUTAS = RutaSerializer(many=True, read_only=True)
+    RUTAS = RutaDiaSerializer(many=True, read_only=True)
 
     class Meta:
         model = Cliente
         fields = "__all__"
+
+
+class ClientesRutaSerializer(serializers.ModelSerializer):
+    clientes_ruta = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RutaDia
+        fields = ("clientes_ruta",)
+
+    def get_clientes_ruta(self, obj):
+        # Assuming obj is an instance of RutaDia, we can access its related Cliente instances
+        return [cliente.NOMBRE for cliente in obj.clientes_ruta.all()]
 
 
 class ClienteVentaSerializer(serializers.ModelSerializer):

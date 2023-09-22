@@ -4,7 +4,7 @@ import os
 from django.core.files.storage import default_storage
 from django.core.files import File
 
-from .models import Producto, Empleado
+from .models import Producto, Empleado, Ruta, RutaDia
 from django.contrib.auth.models import User
 
 
@@ -76,3 +76,26 @@ def save_empleado(sender, instance, **kwargs):
         instance.empleado.save()
     except:
         Empleado.objects.create(USUARIO=instance)
+
+
+# Create a signal for post_save of Ruta that will create RutaDia instances for each day of the week when a new Ruta instance is created.
+@receiver(post_save, sender=Ruta)
+def create_rutadia(sender, instance, created, **kwargs):
+    # Create RutaDia for each day when a new Ruta is created
+    if created:
+        days = [
+            "LUNES",
+            "MARTES",
+            "MIERCOLES",
+            "JUEVES",
+            "VIERNES",
+            "SABADO",
+            "DOMINGO",
+        ]
+        for day in days:
+            RutaDia.objects.create(
+                RUTA=instance,
+                REPARTIDOR=instance.REPARTIDOR,
+                REPARTIDOR_NOMBRE=instance.REPARTIDOR_NOMBRE,
+                DIA=day,
+            )
