@@ -91,6 +91,9 @@ class PrecioClienteSerializer(serializers.ModelSerializer):
         return round(descuento, 2)
 
 
+# Ruta
+
+
 class RutaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ruta
