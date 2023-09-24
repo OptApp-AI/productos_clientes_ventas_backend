@@ -63,7 +63,8 @@ class PrecioClienteSerializer(serializers.ModelSerializer):
     # La cantidad es para poder hacer una venta a este cliente, sabiendo cuantos productos tengo disponibles
 
     # Pero esto solo es necesario cuando realizo una venta, no cuando quiero ver informacion del cliente
-    producto_cantidad = serializers.IntegerField(
+    # ERRROR ESTO NO DEBE SER UN INGEGER
+    producto_cantidad = serializers.FloatField(
         source="PRODUCTO.CANTIDAD", read_only=True
     )
 
@@ -124,7 +125,6 @@ class ClienteSerializer(serializers.ModelSerializer):
 
     DIRECCION = DireccionSerializer(required=False)
 
-    # Por que read only si dson un campo editable del cliente????
     RUTAS = RutaDiaSerializer(many=True, read_only=True)
 
     class Meta:
@@ -217,16 +217,34 @@ class SalidaRutaSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class ClientesRealizarSalidaRutaSerializer(serializers.ModelSerializer):
-    clientes_ruta = serializers.SerializerMethodField()
+class ClienteRealizarSalidaRutaSerializer(serializers.ModelSerializer):
+    ruta_dia_ids = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
-        model = RutaDia
-        fields = ("clientes_ruta",)
+        model = Cliente
+        fields = ("NOMBRE", "id", "ruta_dia_ids")
 
-    def get_clientes_ruta(self, obj):
-        # Assuming obj is an instance of RutaDia, we can access its related Cliente instances
-        return [
-            {"nombre": cliente.NOMBRE, "id": cliente.id}
-            for cliente in obj.clientes_ruta.all()
-        ]
+    def get_ruta_dia_ids(self, obj):
+        ruta_dias = obj.RUTAS
+
+        ruta_dia_ids = [ruta.id for ruta in ruta_dias.all()]
+
+        return ruta_dia_ids
+
+
+class RutasDiaRealizarSalidaRutaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RutaDia
+        fields = (
+            "id",
+            "REPARTIDOR_NOMBRE",
+            "DIA",
+        )
+
+
+class RutasRealizarSalidaRutaSerializer(serializers.ModelSerializer):
+    ruta_dias = RutasDiaRealizarSalidaRutaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Ruta
+        fields = ("NOMBRE", "id", "ruta_dias")

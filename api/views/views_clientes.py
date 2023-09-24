@@ -18,7 +18,8 @@ from api.serializers import (
     RutaDiaSerializer,
     ClientesRutaSerializer,
     RutaRegistrarClienteSerializer,
-    ClientesRealizarSalidaRutaSerializer,
+    ClienteRealizarSalidaRutaSerializer,
+    RutasRealizarSalidaRutaSerializer,
 )
 from django.db.models import Case, When, Value, IntegerField
 from django.db.models import Case, When, Value, IntegerField
@@ -357,17 +358,18 @@ def rutas_registrar_cliente(request):
 
 
 @api_view(["GET"])
-def clientes_salida_ruta_list(request, pk):
-    try:
-        ruta_dia = RutaDia.objects.get(id=pk)
-    except RutaDia.DoesNotExist:
-        return Response(
-            {"message": "Ruta con el id dado no existe"},
-            status=status.HTTP_404_NOT_FOUND,
-        )
+def clientes_salida_ruta_list(request):
+    clientes = Cliente.objects.all()
 
-    # clientes = Cliente.objects.filter(RUTA=pk)
+    serializer = ClienteRealizarSalidaRutaSerializer(clientes, many=True)
 
-    serializer = ClientesRealizarSalidaRutaSerializer(ruta_dia)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(["GET"])
+def ruta_salida_ruta_list(request):
+    rutas = Ruta.objects.all()
+
+    serializer = RutasRealizarSalidaRutaSerializer(rutas, many=True)
 
     return Response(serializer.data, status=status.HTTP_200_OK)
