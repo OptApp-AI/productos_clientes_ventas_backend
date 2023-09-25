@@ -13,6 +13,7 @@ from .models import (
     ProductoSalidaRuta,
     ClienteSalidaRuta,
     SalidaRuta,
+    AjusteInventario,
 )
 from django.contrib.auth.models import User
 
@@ -236,11 +237,13 @@ class ClienteRealizarSalidaRutaSerializer(serializers.ModelSerializer):
 
 
 class RutasDiaRealizarSalidaRutaSerializer(serializers.ModelSerializer):
+    repartidor_id = serializers.IntegerField(source="REPARTIDOR.id", read_only=True)
+
     class Meta:
         model = RutaDia
         fields = (
             "id",
-            "REPARTIDOR_NOMBRE",
+            "repartidor_id",
             "DIA",
         )
 
@@ -251,3 +254,9 @@ class RutasRealizarSalidaRutaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Ruta
         fields = ("NOMBRE", "id", "ruta_dias")
+
+
+class AjusteInventarioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AjusteInventario
+        fields = "__all__"

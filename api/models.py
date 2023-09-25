@@ -334,7 +334,7 @@ class DevolucionSalidaRuta(models.Model):
     )
     PRODUCTO_DEVOLUCION = models.ForeignKey(Producto, on_delete=models.CASCADE)
     PRODUCTO_NOMBRE = models.CharField(max_length=200)
-    CATIDAD_DEVOLUCION = models.IntegerField(validators=[MinValueValidator(1)])
+    CATIDAD_DEVOLUCION = models.IntegerField(validators=[MinValueValidator(0)])
     # La cajera realiza la devolución, pero mientras el administrador no la autorice, el STATUS permanece como pendiente y la cajera no puede realizar el corte
     STATUS = models.CharField(
         max_length=200, choices=(("REALIZADO", "REALIZADO"), ("PENDIENTE", "PENDIENTE"))
@@ -342,3 +342,28 @@ class DevolucionSalidaRuta(models.Model):
 
     def __str__(self):
         return f"{self.SALIDA_RUTA}, {self.CATIDAD_DEVOLUCION}"
+
+
+class AjusteInventario(models.Model):
+    CAJERO = models.CharField(max_length=200)
+
+    BODEGA = models.CharField(max_length=200)
+
+    PRODUCTO = models.ForeignKey(Producto, on_delete=models.SET_NULL, null=True)
+    PRODUCTO_NOMBRE = models.CharField(max_length=200)
+
+    CANTIDAD = models.FloatField(validators=[MinValueValidator(0)])
+
+    TIPO_AJUSTE = models.CharField(
+        max_length=10, choices=(("FALTANTE", "FALTANTE"), ("SOBRANTE", "SOBRANTE"))
+    )
+
+    def save(self, *args, **kwargs):
+        self.PRODUCTO_NOMBRE = self.PRODUCTO_NOMBRE.upper()
+        self.CAJERO = self.CAJERO.upper()
+        self.BODEGA = self.BODEGA.upper()
+
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.PRODUCTO_NOMBRE}, {self.TIPO_AJUSTE}, {self.CANTIDAD}"
